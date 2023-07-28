@@ -1,6 +1,6 @@
 import * as yup from 'yup';
 
-export const noteSchema = yup.object().shape({
+export const createNoteSchema = yup.object().shape({
   name: yup.string().required(),
   date: yup.date().required(),
   category: yup.string().required(),
