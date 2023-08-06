@@ -1,69 +1,86 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { Note } from '../interface/note.interface';
-import { mockedNotes } from '../mock/notes.mock';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { NoteModel } from '../model/note.model';
 import { StatsNotes } from 'src/interface/stats.interface';
 
 @Injectable()
 export class NotesService {
-  private notes: Note[] = mockedNotes;
+  constructor(
+    @Inject('NOTES_REPOSITORY')
+    private readonly noteModel: typeof NoteModel,
+  ) {}
 
-  getAllNotes(): Note[] {
-    return this.notes;
+  async getAllNotes(): Promise<NoteModel[]> {
+    return this.noteModel.findAll();
   }
 
-  getNoteById(id: number): Note {
-    const note = this.notes.find((note) => note.id === id);
+  async getNoteById(id: number): Promise<NoteModel> {
+    const note = await this.noteModel.findByPk(id);
     if (!note) {
       throw new NotFoundException(`Note with ID ${id} not found`);
     }
     return note;
   }
 
-  createNote(note: Note): Note {
-    const newNote: Note = {
-      ...note,
-      id: this.notes.length + 1,
-    };
-    this.notes.push(newNote);
-    return newNote;
+  async createNote(note: Partial<NoteModel>): Promise<NoteModel> {
+    return await this.noteModel.create(note);
   }
 
-  updateNote(id: number, updateNoteDto: Partial<Note>): Note {
-    const noteIndex = this.notes.findIndex((n) => n.id === id);
-    if (noteIndex === -1) {
+  async updateNote(
+    id: number,
+    updateNoteDto: Partial<NoteModel>,
+  ): Promise<NoteModel> {
+    const [rowsUpdated, [updatedNote]] = await this.noteModel.update(
+      updateNoteDto,
+      {
+        where: { id },
+        returning: true,
+      },
+    );
+
+    if (rowsUpdated === 0) {
       throw new NotFoundException(`Note with ID ${id} not found`);
     }
 
-    const originalNote = this.notes[noteIndex];
-    const updatedNote: Note = Object.assign({}, originalNote, updateNoteDto);
-
-    this.notes[noteIndex] = updatedNote;
     return updatedNote;
   }
 
-  deleteNote(id: number): boolean {
-    const initialLength = this.notes.length;
-    this.notes = this.notes.filter((note) => note.id !== id);
-    if (this.notes.length === initialLength) {
+  async deleteNote(id: number): Promise<boolean> {
+    const rowsDeleted = await this.noteModel.destroy({
+      where: { id },
+    });
+
+    if (rowsDeleted === 0) {
       throw new NotFoundException(`Note with ID ${id} not found`);
     }
+
     return true;
   }
 
-  getStats(): StatsNotes {
-    const totalNotes = this.notes.length;
+  async getStats(): Promise<StatsNotes> {
+    const totalNotes = await this.noteModel.count();
 
-    const categoryCounts: { [key: string]: number } = {};
-    this.notes.forEach((note) => {
-      if (note.category in categoryCounts) {
-        categoryCounts[note.category]++;
-      } else {
-        categoryCounts[note.category] = 1;
-      }
+    const categoryCounts = await this.noteModel.findAll({
+      attributes: [
+        'category',
+        [
+          this.noteModel.sequelize.fn(
+            'COUNT',
+            this.noteModel.sequelize.col('category'),
+          ),
+          'count',
+        ],
+      ],
+      group: ['category'],
     });
+
+    const categoryCountsMap: { [key: string]: number } = {};
+    categoryCounts.forEach((categoryCount: any) => {
+      categoryCountsMap[categoryCount.category] = categoryCount.get('count');
+    });
+
     return {
       totalNotes,
-      categoryCounts,
+      categoryCounts: categoryCountsMap,
     };
   }
 }
