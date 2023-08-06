@@ -9,32 +9,32 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { NotesService } from '../services/notes.service';
-import { Note } from '../interface/note.interface';
+import { NoteModel } from '../model/note.model';
+import { StatsNotes } from '../interface/stats.interface';
 import { createNoteSchema, updateNoteSchema } from '../schema/note.schema';
-import { StatsNotes } from 'src/interface/stats.interface';
 
 @Controller('notes')
 export class NotesController {
   constructor(private readonly notesService: NotesService) {}
 
   @Get()
-  getAllNotes(): Note[] {
+  async getAllNotes(): Promise<NoteModel[]> {
     return this.notesService.getAllNotes();
   }
 
   @Get('/stats')
-  getStats(): StatsNotes {
+  async getStats(): Promise<StatsNotes> {
     return this.notesService.getStats();
   }
 
   @Get('/:id')
-  getNoteById(@Param('id') id: string): Note {
+  async getNoteById(@Param('id') id: string): Promise<NoteModel> {
     const noteId = parseInt(id, 10);
     return this.notesService.getNoteById(noteId);
   }
 
   @Post()
-  async createNote(@Body() createNoteDto: Note): Promise<Note> {
+  async createNote(@Body() createNoteDto: NoteModel): Promise<NoteModel> {
     try {
       await createNoteSchema.validate(createNoteDto);
     } catch (error) {
@@ -47,8 +47,8 @@ export class NotesController {
   @Patch('/:id')
   async updateNote(
     @Param('id') id: string,
-    @Body() updateNoteDto: Note,
-  ): Promise<Note> {
+    @Body() updateNoteDto: NoteModel,
+  ): Promise<NoteModel> {
     try {
       await updateNoteSchema.validate(updateNoteDto);
     } catch (error) {
@@ -59,7 +59,7 @@ export class NotesController {
   }
 
   @Delete('/:id')
-  deleteNote(@Param('id') id: string): boolean {
+  async deleteNote(@Param('id') id: string): Promise<boolean> {
     const noteId = parseInt(id, 10);
     return this.notesService.deleteNote(noteId);
   }
